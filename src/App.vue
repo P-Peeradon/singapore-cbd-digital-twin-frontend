@@ -1,7 +1,31 @@
 <script setup lang="ts">
-import HelloWorld from './components/HelloWorld.vue'
+import { useTemplateRef, onMounted, onUnmounted } from 'vue';
+import SceneManager from './three/SceneManager';
+
+let sceneManager: SceneManager | null = null;
+const canvasRef = useTemplateRef<HTMLCanvasElement | null>('canvasRef')
+
+onMounted(() => {
+  console.log('Canvas ref:', canvasRef.value);
+  sceneManager = new SceneManager(canvasRef.value!);
+
+  startRenderLoop();
+});
+
+onUnmounted(() => {
+  sceneManager?.dispose();
+});
 </script>
 
 <template>
-  <HelloWorld />
+  <canvas ref="canvasRef"></canvas>
 </template>
+
+<style scoped>
+  html, body {
+    width: 100vw;
+    height: 100vh;
+    display: block;
+    overflow: hidden;
+  }
+</style>
