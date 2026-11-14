@@ -1,0 +1,13 @@
+{ 
+    "system": { 
+        "title": "Singapore CBD 3D Digital Twin", 
+        "subtitle": "Urban Geospatial Simulation Platform", 
+        "district": "Raffles Place & Marina Bay Financial Centre" 
+    }, 
+    "metrics": { 
+        "far": "Floor-Area Ratio (FAR)", 
+        "valuation": "Commercial Valuation", 
+        "occupancy": "Committed Occupancy", 
+        "greenCertification": "BCA Green Mark Rating" 
+    } 
+}
