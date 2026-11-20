@@ -19,7 +19,7 @@ onMounted(async () => {
   );
   const buildingMesh = GeoJSONLoader.createMesh(buildingGeometry, meshMaterials.vert);
   sceneManager.addMesh(buildingMesh);
-  const buildingEdges = GeoJSONLoader.createLine(buildingGeometry, lineMaterials.blanc);
+  const buildingEdges = GeoJSONLoader.createLine(buildingGeometry, lineMaterials.noir);
   sceneManager.addLine(buildingEdges);
 
   sceneManager.startRenderLoop();
