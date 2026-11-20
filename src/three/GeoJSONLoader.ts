@@ -25,6 +25,18 @@ type BuildingFeatureCollection = {
 
 type ThreeCoordinate = [number, number, number];
 
+type ExtrusionResponse = {
+    levels: number[];
+};
+
+function isCounterClockwise(ring: THREE.Vector2[]): boolean {
+    const signedArea = ring.reduce((area, point, index) => {
+        const next = ring[(index + 1) % ring.length];
+        return area + point.x * next.y - next.x * point.y;
+    }, 0);
+    return signedArea > 0;
+}
+
 class GeoJSONLoader {
 
     static async loadBuilding(): Promise<[BuildingProperties, GeoJSONPolygon]> {
@@ -49,40 +61,110 @@ class GeoJSONLoader {
         return geometry.coordinates.map((ring) => ring.map(transformPosition));
     }
 
-    static createGeometryFromCoords(coords: ThreeCoordinate[][]): THREE.Shape {
-        if (coords.length === 0) {
-            throw new Error("A polygon must contain an outer ring.");
-        }
-
-        const shape = new THREE.Shape();
-        this.addRingToPath(shape, coords[0]);
-        shape.holes = coords.slice(1).map((ring) => {
-            const hole = new THREE.Path();
-            this.addRingToPath(hole, ring);
-            return hole;
-        });
-        return shape;
-    }
-
-    static extrudeGeometry(
-        shape: THREE.Shape,
+    static async extrudeGeometry(
+        rings: ThreeCoordinate[][],
         heightMeters: number,
-        steps: number,
-    ): THREE.BufferGeometry {
+        storeys: number,
+    ): Promise<THREE.BufferGeometry> {
         if (!Number.isFinite(heightMeters) || heightMeters <= 0) {
             throw new RangeError("Building height must be a positive finite number.");
         }
-        if (!Number.isInteger(steps) || steps < 1) {
-            throw new RangeError("Extrusion steps must be a positive integer.");
+        if (!Number.isInteger(storeys) || storeys < 1) {
+            throw new RangeError("Building storeys must be a positive integer.");
         }
-        const geometry = new THREE.ExtrudeGeometry(shape, {
-            depth: heightMeters,
-            steps,
-            bevelEnabled: false,
+
+        const polygon = rings.map((ring) => ring.map(([x, , z]) => [x, z]));
+        const { data } = await axios.post<ExtrusionResponse>("/compute/matrix/extrude", {
+            polygon,
+            height: heightMeters,
+            storey: storeys,
         });
 
-        // GeoJSON maps northing to Three.js Z; rotate local extrusion Z to world Y.
-        geometry.rotateX(-Math.PI / 2);
+        const levels = data.levels;
+        if (
+            levels.length !== storeys + 1
+            || levels[0] !== 0
+            || levels[levels.length - 1] !== heightMeters
+            || levels.some((level, index) => !Number.isFinite(level) || (index > 0 && level <= levels[index - 1]))
+        ) {
+            throw new Error("The extrusion service returned invalid floor elevations.");
+        }
+
+        const normalizedRings = rings.map((ring) => {
+            const points = ring.map(([x, , z]) => new THREE.Vector2(x, z));
+            if (points.length > 1 && points[0].equals(points[points.length - 1])) {
+                points.pop();
+            }
+            if (points.length < 3) {
+                throw new Error("Each polygon ring must contain at least three distinct points.");
+            }
+            return points;
+        });
+
+        const contour = normalizedRings[0];
+        if (!contour) {
+            throw new Error("A polygon must contain an outer ring.");
+        }
+
+        const holes = normalizedRings.slice(1);
+        const triangulatedFaces = THREE.ShapeUtils.triangulateShape(contour, holes);
+        const points = normalizedRings.flat();
+
+        // Each floor elevation gets a copy of every 2D ring vertex.
+        const positions: number[] = [];
+        for (const level of levels) {
+            for (const point of points) {
+                positions.push(point.x, level, point.y);
+            }
+        }
+
+        const pointCount = points.length;
+        const topOffset = (levels.length - 1) * pointCount;
+        // Reverse cap triangles as needed so the base and roof face outward.
+        const indices = triangulatedFaces.flatMap(([a, b, c]) => {
+            const pointA = points[a];
+            const pointB = points[b];
+            const pointC = points[c];
+            const winding = (pointB.x - pointA.x) * (pointC.y - pointA.y)
+                - (pointB.y - pointA.y) * (pointC.x - pointA.x);
+            return winding > 0
+                ? [a, b, c, topOffset + a, topOffset + c, topOffset + b]
+                : [a, c, b, topOffset + a, topOffset + b, topOffset + c];
+        });
+
+        // Precompute each ring edge and its winding once, then reuse it between floors.
+        let ringOffset = 0;
+        const edges = normalizedRings.flatMap((ring, ringIndex) => {
+            const reverse = ringIndex === 0
+                ? isCounterClockwise(ring)
+                : !isCounterClockwise(ring);
+            const ringEdges = ring.map((_, index) => ({
+                start: ringOffset + index,
+                end: ringOffset + ((index + 1) % ring.length),
+                reverse,
+            }));
+            ringOffset += ring.length;
+            return ringEdges;
+        });
+        for (let levelIndex = 0; levelIndex < levels.length - 1; levelIndex += 1) {
+            const lowerOffset = levelIndex * pointCount;
+            const upperOffset = (levelIndex + 1) * pointCount;
+            for (const edge of edges) {
+                const lowerStart = lowerOffset + edge.start;
+                const lowerEnd = lowerOffset + edge.end;
+                const upperStart = upperOffset + edge.start;
+                const upperEnd = upperOffset + edge.end;
+                if (edge.reverse) {
+                    indices.push(lowerStart, upperEnd, lowerEnd, lowerStart, upperStart, upperEnd);
+                } else {
+                    indices.push(lowerStart, lowerEnd, upperEnd, lowerStart, upperEnd, upperStart);
+                }
+            }
+        }
+
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+        geometry.setIndex(indices);
         geometry.computeVertexNormals();
         return geometry;
     }
@@ -91,24 +173,8 @@ class GeoJSONLoader {
         return new THREE.Mesh(geometry, material);
     }
 
-    static createLine(geometry: THREE.BufferGeometry, material: THREE.Material): THREE.Line {
-        return new THREE.Line(geometry, material);
-    }
-
-    private static addRingToPath(path: THREE.Path, ring: ThreeCoordinate[]): void {
-        const points = ring.map(([x, , z]) => new THREE.Vector2(x, -z));
-        if (points.length > 1 && points[0].equals(points[points.length - 1])) {
-            points.pop();
-        }
-        if (points.length < 3) {
-            throw new Error("Each polygon ring must contain at least three distinct points.");
-        }
-
-        path.moveTo(points[0].x, points[0].y);
-        for (const point of points.slice(1)) {
-            path.lineTo(point.x, point.y);
-        }
-        path.closePath();
+    static createLine(geometry: THREE.BufferGeometry, material: THREE.Material): THREE.LineSegments {
+        return new THREE.LineSegments(new THREE.EdgesGeometry(geometry, 1), material);
     }
 
 }
