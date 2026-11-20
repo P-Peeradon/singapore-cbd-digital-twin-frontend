@@ -49,17 +49,7 @@ class GeoJSONLoader {
         return geometry.coordinates.map((ring) => ring.map(transformPosition));
     }
 
-    static createGeometryFromCoords(
-        coords: ThreeCoordinate[][],
-        heightMeters: number,
-        steps: number,
-    ): THREE.BufferGeometry {
-        if (!Number.isFinite(heightMeters) || heightMeters <= 0) {
-            throw new RangeError("Building height must be a positive finite number.");
-        }
-        if (!Number.isInteger(steps) || steps < 1) {
-            throw new RangeError("Extrusion steps must be a positive integer.");
-        }
+    static createGeometryFromCoords(coords: ThreeCoordinate[][]): THREE.Shape {
         if (coords.length === 0) {
             throw new Error("A polygon must contain an outer ring.");
         }
@@ -71,7 +61,20 @@ class GeoJSONLoader {
             this.addRingToPath(hole, ring);
             return hole;
         });
+        return shape;
+    }
 
+    static extrudeGeometry(
+        shape: THREE.Shape,
+        heightMeters: number,
+        steps: number,
+    ): THREE.BufferGeometry {
+        if (!Number.isFinite(heightMeters) || heightMeters <= 0) {
+            throw new RangeError("Building height must be a positive finite number.");
+        }
+        if (!Number.isInteger(steps) || steps < 1) {
+            throw new RangeError("Extrusion steps must be a positive integer.");
+        }
         const geometry = new THREE.ExtrudeGeometry(shape, {
             depth: heightMeters,
             steps,
