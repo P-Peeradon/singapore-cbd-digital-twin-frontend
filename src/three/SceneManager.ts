@@ -17,6 +17,7 @@ class SceneManager {
         const aspect = window.innerWidth / window.innerHeight; 
         this.camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 2000); 
         this.camera.position.set(0, 150, 300);
+        this.camera.lookAt(0, 0, 0);
 
         // WebGL renderer initialisation
         this.renderer = new THREE.WebGLRenderer({ 

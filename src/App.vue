@@ -9,6 +9,7 @@ const canvasRef = useTemplateRef<HTMLCanvasElement | null>('canvasRef')
 onMounted(() => {
   console.log('Canvas ref:', canvasRef.value);
   sceneManager = new SceneManager(canvasRef.value!);
+  GeoJSONLoader.loadBuilding();
   sceneManager.addMesh(tetraGeo, rougeMaterial);
 
   sceneManager.startRenderLoop();

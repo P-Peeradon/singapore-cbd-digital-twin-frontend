@@ -1,3 +1,4 @@
+import axios from 'axios';
 import * as THREE from 'three';
 
 const vertices: number[] = [1, 1, 1, -1, -1, 1, -1, 1, -1, 1, -1, -1];
@@ -8,3 +9,17 @@ export const magentaMaterial: THREE.MeshBasicMaterial = new THREE.MeshBasicMater
 export const vertMaterial: THREE.MeshBasicMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
 export const jauneMaterial: THREE.MeshBasicMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
 export const bleuMaterial: THREE.MeshBasicMaterial = new THREE.MeshBasicMaterial({ color: 0x0000ff });
+
+const SingaporeCBDAnchor: number[] = [103.8544, 1.28045];
+
+class GeoJSONLoader {
+
+    static async loadBuilding(): Promise<void> {
+        const { data } = await axios.get("/api/building/");
+        const geojson = data;
+        console.log("GeoJSON data:", geojson);
+        // Process the GeoJSON data as needed
+    }
+}
+
+export default GeoJSONLoader;
