@@ -41,6 +41,10 @@ class SceneManager {
         this.scene.add(mesh); 
     }
 
+    addLine(line: THREE.Line): void {
+        this.scene.add(line);
+    }
+
     private onWindowResize(): void { 
         const width = window.innerWidth; 
         const height = window.innerHeight; 
