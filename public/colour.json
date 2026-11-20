@@ -1,0 +1,11 @@
+{
+    "rouge": "#FF0000",
+    "magenta": "#FF00FF",
+    "vert": "#00FF00",
+    "jaune": "#FFFF00",
+    "bleu": "#0000FF",
+    "cyan": "#00FFFF",
+    "blanc": "#FFFFFF",
+    "noir": "#000000",
+    "gris": "#808080"
+}
