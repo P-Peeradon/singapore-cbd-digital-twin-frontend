@@ -12,12 +12,14 @@ onMounted(async () => {
   sceneManager = new SceneManager(canvasRef.value!);
   const [properties, geometry] = await GeoJSONLoader.loadBuilding();
   const transformedCoordinates = GeoJSONLoader.transformCoordinates(geometry);
-  const buildingGeometry = GeoJSONLoader.createGeometryFromCoords(
-    transformedCoordinates,
+  const buildingShape = GeoJSONLoader.createGeometryFromCoords(transformedCoordinates);
+  const buildingGeometry = GeoJSONLoader.extrudeGeometry(
+    buildingShape,
     properties.heightMeters,
     properties.storeys,
   );
-  sceneManager.addMesh(buildingGeometry, meshMaterials.vert);
+  const buildingMesh = GeoJSONLoader.createMesh(buildingGeometry, meshMaterials.vert);
+  sceneManager.addMesh(buildingMesh);
 
   sceneManager.startRenderLoop();
 });
