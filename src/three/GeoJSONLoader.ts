@@ -1,16 +1,10 @@
 import axios from 'axios';
 import * as THREE from 'three';
+import { lineMaterials } from '../../public/material.ts';
 
 const vertices: number[] = [1, 1, 1, -1, -1, 1, -1, 1, -1, 1, -1, -1];
 const indices: number[] = [2, 1, 0, 0, 3, 2, 1, 3, 0, 2, 3, 1];
 export const tetraGeo: THREE.PolyhedronGeometry = new THREE.PolyhedronGeometry(vertices, indices, 10, 0);
-export const rougeMaterial: THREE.MeshBasicMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-export const rougeLineMaterial: THREE.LineBasicMaterial = new THREE.LineBasicMaterial({ color: 0xff0000 });
-export const magentaMaterial: THREE.MeshBasicMaterial = new THREE.MeshBasicMaterial({ color: 0xff00ff });
-export const vertMaterial: THREE.MeshBasicMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-export const jauneMaterial: THREE.MeshBasicMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-export const bleuMaterial: THREE.MeshBasicMaterial = new THREE.MeshBasicMaterial({ color: 0x0000ff });
-
 const SingaporeCBDAnchor: number[] = [103.8544, 1.28045];
 
 type GeoJSONLineString = {
@@ -57,11 +51,11 @@ class GeoJSONLoader {
 
     static createGeometryFromCoords(coords: ThreeCoordinate[][]): THREE.Line {
         const vectorPoints: THREE.Vector3[] = coords.flatMap((ring) => ring.map(([x, y, z]) => new THREE.Vector3(x, y, z)));
-        const geometryBuffer = new THREE.BufferGeometry().setFromPoints(vectorPoints);
-        rougeLineMaterial.linewidth = 2; // Set the line width for the building edges
-        const building = new THREE.Line(geometryBuffer, rougeLineMaterial);
+        const geometryBuffer: THREE.BufferGeometry = new THREE.BufferGeometry().setFromPoints(vectorPoints);
+        lineMaterials.rouge.linewidth = 2; // Set the line width for the building edges
+        const building = new THREE.Line(geometryBuffer, lineMaterials.rouge);
         console.log('Building created with geometry:', geometryBuffer);
-        console.log('Building created with material:', rougeLineMaterial);
+        console.log('Building created with material:', lineMaterials.rouge);
         return building;
     }
 

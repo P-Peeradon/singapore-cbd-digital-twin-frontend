@@ -1,7 +1,7 @@
 // Create mesh and line material for quick reference.
 // This is a permanent solution to avoid creating new materials for each mesh or line.
 import * as THREE from 'three';
-import colour from './colour.json';
+import * as colour from './colour.json' with { type: 'json' };
 // Cartesian Product of colours x geometry types.
 
 export const meshMaterials: Record<string, THREE.MeshBasicMaterial> = Object.fromEntries(
