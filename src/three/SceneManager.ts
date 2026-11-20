@@ -36,8 +36,7 @@ class SceneManager {
         window.addEventListener('resize', this.onWindowResize.bind(this)); 
     }
 
-    addMesh(geometry: THREE.BufferGeometry, material: THREE.Material): void { 
-        const mesh = new THREE.Mesh(geometry, material); 
+    addMesh(mesh: THREE.Mesh): void {
         this.scene.add(mesh); 
     }
 

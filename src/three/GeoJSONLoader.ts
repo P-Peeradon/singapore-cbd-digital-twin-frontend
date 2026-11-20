@@ -87,6 +87,14 @@ class GeoJSONLoader {
         return geometry;
     }
 
+    static createMesh(geometry: THREE.BufferGeometry, material: THREE.Material): THREE.Mesh {
+        return new THREE.Mesh(geometry, material);
+    }
+
+    static createLine(geometry: THREE.BufferGeometry, material: THREE.Material): THREE.Line {
+        return new THREE.Line(geometry, material);
+    }
+
     private static addRingToPath(path: THREE.Path, ring: ThreeCoordinate[]): void {
         const points = ring.map(([x, , z]) => new THREE.Vector2(x, -z));
         if (points.length > 1 && points[0].equals(points[points.length - 1])) {
