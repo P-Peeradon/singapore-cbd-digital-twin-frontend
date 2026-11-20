@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { useTemplateRef, onMounted, onUnmounted } from 'vue';
 import SceneManager from './three/SceneManager';
-import { tetraGeo, rougeMaterial } from './three/GeoJSONLoader';
+import GeoJSONLoader from './three/GeoJSONLoader';
 
 let sceneManager: SceneManager | null = null;
 const canvasRef = useTemplateRef<HTMLCanvasElement | null>('canvasRef')
 
-onMounted(() => {
+onMounted(async () => {
   console.log('Canvas ref:', canvasRef.value);
   sceneManager = new SceneManager(canvasRef.value!);
-  GeoJSONLoader.loadBuilding();
-  sceneManager.addMesh(tetraGeo, rougeMaterial);
+  const [properties, geometry] = await GeoJSONLoader.loadBuilding();
+  const transformedCoordinates = GeoJSONLoader.transformCoordinates(geometry);
+  const buildingGeometry = GeoJSONLoader.createGeometryFromCoords(transformedCoordinates);
+  sceneManager.addLine(buildingGeometry);
 
   sceneManager.startRenderLoop();
 });
