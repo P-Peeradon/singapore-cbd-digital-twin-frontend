@@ -3,6 +3,7 @@ import { useTemplateRef, onMounted, onUnmounted } from 'vue';
 import SceneManager from './three/SceneManager.ts';
 import GeoJSONLoader from './three/GeoJSONLoader.ts';
 import { lineMaterials, meshMaterials } from '../public/material.ts';
+import SimulationControl from './components/SimulationControl.vue';
 
 let sceneManager: SceneManager | null = null;
 const canvasRef = useTemplateRef<HTMLCanvasElement | null>('canvasRef')
@@ -19,8 +20,10 @@ onMounted(async () => {
   );
   const buildingMesh = GeoJSONLoader.createMesh(buildingGeometry, meshMaterials.vert);
   sceneManager.addMesh(buildingMesh);
+  sceneManager.addStoreyHeightObject(buildingMesh);
   const buildingEdges = GeoJSONLoader.createLine(buildingGeometry, lineMaterials.noir);
   sceneManager.addLine(buildingEdges);
+  sceneManager.addStoreyHeightObject(buildingEdges);
 
   sceneManager.startRenderLoop();
 });
@@ -28,10 +31,15 @@ onMounted(async () => {
 onUnmounted(() => {
   sceneManager?.dispose();
 });
+
+function setStoreyHeightMultiplier(multiplier: number): void {
+  sceneManager?.setStoreyHeightMultiplier(multiplier);
+}
 </script>
 
 <template>
   <canvas ref="canvasRef"></canvas>
+  <SimulationControl @storey-height-multiplier="setStoreyHeightMultiplier" />
 </template>
 
 <style scoped>
