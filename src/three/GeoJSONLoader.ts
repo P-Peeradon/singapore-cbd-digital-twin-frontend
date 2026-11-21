@@ -1,97 +1,96 @@
-import axios from 'axios';
-import * as THREE from 'three';
+import * as THREE from 'three'; 
 import Triangulation from './Triangulation.ts';
-import type { ThreeCoordinate } from './Triangulation.ts';
+import axios from 'axios';
 
-const vertices: number[] = [1, 1, 1, -1, -1, 1, -1, 1, -1, 1, -1, -1];
-const indices: number[] = [2, 1, 0, 0, 3, 2, 1, 3, 0, 2, 3, 1];
-export const tetraGeo: THREE.PolyhedronGeometry = new THREE.PolyhedronGeometry(vertices, indices, 10, 0);
-const SingaporeCBDAnchor: number[] = [103.8544, 1.28045];
+class GeoJSONLoader { 
+    private scene: THREE.Scene; 
+    private buildingsGroup: THREE.Group; 
+    private currentHeightScale: number = 3.5; 
+    private cachedGeoJSON: any = null; 
 
-type GeoJSONPolygon = {
-    type: "Polygon";
-    coordinates: number[][][];
-};
+    // Shared Singapore CBD Anchor (MBFC Centroid: 103.8544° E, 1.28045° N) 
+    private readonly anchorLon: number = 103.8544; 
+    private readonly anchorLat: number = 1.28045; 
+    private readonly metersPerDegree: number = 111320.0;
 
-type BuildingProperties = {
-    heightMeters: number;
-    storeys: number;
-};
-
-type BuildingFeatureCollection = {
-    features: Array<{
-        properties: BuildingProperties;
-        geometry: GeoJSONPolygon;
-    }>;
-};
-
-type ExtrusionResponse = {
-    levels: number[];
-};
-
-class GeoJSONLoader {
-
-    static async loadBuilding(): Promise<[BuildingProperties, GeoJSONPolygon]> {
-        const { data } = await axios.get<BuildingFeatureCollection>("/api/buildings");
-        const feature = data.features[0];
-        if (!feature) {
-            throw new Error("The buildings response did not contain a feature.");
-        }
-
-        return [feature.properties, feature.geometry];
+    constructor(scene: THREE.Scene) { 
+        this.scene = scene; 
+        this.buildingsGroup = new THREE.Group(); 
+        this.buildingsGroup.name = 'singapore-cbd-buildings'; 
+        this.scene.add(this.buildingsGroup); 
     }
 
-    // Transform the coordinates from the GeoJSON to Three.js coordinates
-    static transformCoordinates(geometry: GeoJSONPolygon): ThreeCoordinate[][] {
-        const anchorLatitudeRadians = SingaporeCBDAnchor[1] * (Math.PI / 180);
-        const transformPosition = ([longitude, latitude]: number[]): ThreeCoordinate => [
-            (longitude - SingaporeCBDAnchor[0]) * 111320 * Math.cos(anchorLatitudeRadians),
-            0,
-            (latitude - SingaporeCBDAnchor[1]) * 111320
-        ];
-
-        return geometry.coordinates.map((ring) => ring.map(transformPosition));
+    async loadBuildings(apiUrl: string = '/api/buildings'): Promise<void> {
+        try { 
+            const response = await axios.get(apiUrl); 
+            if (!response.data) { 
+                throw new Error(`Failed to fetch buildings: ${response.statusText}`); 
+            } this.cachedGeoJSON = response.data; 
+            this.renderBuildings(); 
+        } catch (error) { 
+            console.error('[GeoJSONLoader] Error loading building footprints:', error); 
+        }
     }
 
-    static async extrudeGeometry(
-        rings: ThreeCoordinate[][],
-        heightMeters: number,
-        storeys: number,
-    ): Promise<THREE.BufferGeometry> {
-        if (!Number.isFinite(heightMeters) || heightMeters <= 0) {
-            throw new RangeError("Building height must be a positive finite number.");
-        }
-        if (!Number.isInteger(storeys) || storeys < 1) {
-            throw new RangeError("Building storeys must be a positive integer.");
-        }
-
-        const normalizedRings = Triangulation.validateTopology(rings);
-        const polygon = normalizedRings.map((ring) => ring.map(([x, , z]) => [x, z]));
-        const { data } = await axios.post<ExtrusionResponse>("/compute/matrix/extrude", {
-            polygon,
-            height: heightMeters,
-            storey: storeys,
-        });
-
-        const levels = data.levels;
-        if (
-            levels.length !== storeys + 1
-            || levels[0] !== 0
-            || levels[levels.length - 1] !== heightMeters
-            || levels.some((level, index) => !Number.isFinite(level) || (index > 0 && level <= levels[index - 1]))
-        ) {
-            throw new Error("The extrusion service returned invalid floor elevations.");
-        }
-
-        return Triangulation.createExtrudedGeometry(normalizedRings, levels);
+    public setHeightScale(scale: number): void { 
+        this.currentHeightScale = scale; 
+        if (this.cachedGeoJSON) this.renderBuildings(); 
     }
 
-    static createMesh(geometry: THREE.BufferGeometry, material: THREE.Material): THREE.Mesh {
-        return new THREE.Mesh(geometry, material);
+    private renderBuildings(): void { 
+        // 1. Dispose of existing GPU geometry buffers prior to rebuilding 
+        this.dispose(); 
+        if (!this.cachedGeoJSON || !this.cachedGeoJSON.features) return; 
+        
+        // Use MeshNormalMaterial for diagnostic verification of surface orientations 
+        const baseMaterial = new THREE.MeshNormalMaterial({ side: THREE.FrontSide }); 
+        const edgeMaterial = new THREE.LineBasicMaterial({ color: 0xffffff }); 
+        for (const feature of this.cachedGeoJSON.features) { 
+            if (feature.geometry.type !== 'Polygon') continue; 
+            
+            const rawCoordinates: number[][] = feature.geometry.coordinates[0]; 
+            const storeys: number = feature.properties.storeys || 10; 
+            const height: number = storeys * this.currentHeightScale; 
+            
+            // Extract unique polygon ring vertices (omitting identical closing coordinate) 
+            const footprint2D: THREE.Vector2[] = []; 
+            const len = rawCoordinates.length; 
+            const uniqueCount = (len > 1 && 
+                rawCoordinates[0][0] === rawCoordinates[len - 1][0] && rawCoordinates[0][1] === rawCoordinates[len - 1][1]) ? 
+                len - 1 : len; 
+                
+            for (let i = 0; i < uniqueCount; i++) { 
+                const [lon, lat] = rawCoordinates[i]; 
+                // Convert geographic degrees to localized metric Cartesian offsets 
+                const x = (lon - this.anchorLon) * this.metersPerDegree * Math.cos(this.anchorLat * (Math.PI / 180.0)); 
+                const z = -(lat - this.anchorLat) * this.metersPerDegree; 
+                footprint2D.push(new THREE.Vector2(x, z)); 
+            } // Construct extruded BufferGeometry prism via Triangulation utility 
+            
+            const geometry = Triangulation.buildPrismGeometry(footprint2D, height, storeys); 
+            const mesh = new THREE.Mesh(geometry, baseMaterial); 
+            mesh.name = feature.properties.buildingId || 'cbd-building'; 
+            
+            // Overlay architectural wireframe (threshold = 1 strips coplanar triangle diagonals) 
+            const edges = new THREE.EdgesGeometry(geometry, 1); 
+            const lineSegments = new THREE.LineSegments(edges, edgeMaterial); 
+            mesh.add(lineSegments); this.buildingsGroup.add(mesh); 
+        } 
     }
 
-    static createLine(geometry: THREE.BufferGeometry, material: THREE.Material): THREE.LineSegments {
-        return new THREE.LineSegments(new THREE.EdgesGeometry(geometry, 1), material);
+    public dispose(): void { 
+        while (this.buildingsGroup.children.length > 0) { 
+            const child = this.buildingsGroup.children[0] as THREE.Mesh; 
+            if (child.geometry) child.geometry.dispose(); 
+            
+            child.traverse((sub) => { 
+                if ((sub as THREE.LineSegments).isLineSegments) { 
+                    (sub as THREE.LineSegments).geometry.dispose(); 
+                } 
+            }); 
+            
+            this.buildingsGroup.remove(child); 
+        } 
     }
 
 }
