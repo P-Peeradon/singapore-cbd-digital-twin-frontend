@@ -6,30 +6,22 @@ import { lineMaterials, meshMaterials } from '../public/material.ts';
 import SimulationControl from './components/SimulationControl.vue';
 
 let sceneManager: SceneManager | null = null;
+let geoJSONLoader: GeoJSONLoader | null = null;
 const canvasRef = useTemplateRef<HTMLCanvasElement | null>('canvasRef')
 
-onMounted(async () => {
-  console.log('Canvas ref:', canvasRef.value);
-  sceneManager = new SceneManager(canvasRef.value!);
-  const [properties, geometry] = await GeoJSONLoader.loadBuilding();
-  const transformedCoordinates = GeoJSONLoader.transformCoordinates(geometry);
-  const buildingGeometry = await GeoJSONLoader.extrudeGeometry(
-    transformedCoordinates,
-    properties.heightMeters,
-    properties.storeys,
-  );
-  const buildingMesh = GeoJSONLoader.createMesh(buildingGeometry, meshMaterials.vert);
-  sceneManager.addMesh(buildingMesh);
-  sceneManager.addStoreyHeightObject(buildingMesh);
-  const buildingEdges = GeoJSONLoader.createLine(buildingGeometry, lineMaterials.noir);
-  sceneManager.addLine(buildingEdges);
-  sceneManager.addStoreyHeightObject(buildingEdges);
-
-  sceneManager.startRenderLoop();
+onMounted(() => { 
+    if (!canvasRef.value) return; 
+    // Initialize Three.js triad outside Vue reactivity 
+    sceneManager = new SceneManager(canvasRef.value); 
+    sceneManager.startRenderLoop(); 
+    // Instantiate GeoJSONLoader and fetch initial building dataset 
+    geoJSONLoader = new GeoJSONLoader(sceneManager.scene); 
+    geoJSONLoader.loadBuildings('/api/buildings'); 
 });
 
-onUnmounted(() => {
-  sceneManager?.dispose();
+onUnmounted(() => { 
+  geoJSONLoader?.dispose(); 
+  sceneManager?.dispose(); 
 });
 
 function setStoreyHeightMultiplier(multiplier: number): void {
@@ -38,15 +30,22 @@ function setStoreyHeightMultiplier(multiplier: number): void {
 </script>
 
 <template>
-  <canvas ref="canvasRef"></canvas>
-  <SimulationControl @storey-height-multiplier="setStoreyHeightMultiplier" />
+  <div class="digital-twin-container">
+    <canvas ref="canvasRef" class="webgl-canvas"></canvas>
+    <SimulationControl @storey-height-multiplier="setStoreyHeightMultiplier" />
+  </div>
 </template>
 
 <style scoped>
-  html, body {
-    width: 100vw;
-    height: 100vh;
-    display: block;
-    overflow: hidden;
+  .digital-twin-container { 
+    position: relative; 
+    width: 100vw; 
+    height: 100vh; 
+    overflow: hidden; 
+  }
+  .webgl-canvas { 
+    width: 100%; 
+    height: 100%; 
+    display: block; 
   }
 </style>
