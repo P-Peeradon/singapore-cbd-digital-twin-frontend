@@ -56,8 +56,10 @@ class GeoJSONLoader {
             const footprint2D: THREE.Vector2[] = []; 
             const len = rawCoordinates.length; 
             const uniqueCount = (len > 1 && 
-                rawCoordinates[0][0] === rawCoordinates[len - 1][0] && rawCoordinates[0][1] === rawCoordinates[len - 1][1]) ? 
-                len - 1 : len; 
+                rawCoordinates[0][0] === rawCoordinates[len - 1][0] && 
+                rawCoordinates[0][1] === rawCoordinates[len - 1][1]) ? 
+                len - 1 : 
+                len; 
                 
             for (let i = 0; i < uniqueCount; i++) { 
                 const [lon, lat] = rawCoordinates[i]; 
