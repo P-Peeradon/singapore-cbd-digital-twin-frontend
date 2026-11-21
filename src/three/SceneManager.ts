@@ -6,6 +6,7 @@ class SceneManager {
     public camera: THREE.PerspectiveCamera;
     public renderer: THREE.WebGLRenderer;
     private animationFrameId: number | null = null;
+    private storeyHeightObjects = new Set<THREE.Object3D>();
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -44,6 +45,20 @@ class SceneManager {
         this.scene.add(line);
     }
 
+    addStoreyHeightObject(object: THREE.Object3D): void {
+        this.storeyHeightObjects.add(object);
+    }
+
+    setStoreyHeightMultiplier(multiplier: number): void {
+        if (!Number.isFinite(multiplier) || multiplier <= 0) {
+            throw new RangeError("Storey height multiplier must be a positive finite number.");
+        }
+
+        for (const object of this.storeyHeightObjects) {
+            object.scale.y = multiplier;
+        }
+    }
+
     private onWindowResize(): void { 
         const width = window.innerWidth; 
         const height = window.innerHeight; 
@@ -67,6 +82,7 @@ class SceneManager {
         window.removeEventListener('resize', this.onWindowResize.bind(this)); 
         this.renderer.dispose(); 
         this.scene.clear(); 
+        this.storeyHeightObjects.clear();
     }
 
 }
