@@ -1,5 +1,7 @@
 import axios from 'axios';
 import * as THREE from 'three';
+import Triangulation from './Triangulation.ts';
+import type { ThreeCoordinate } from './Triangulation.ts';
 
 const vertices: number[] = [1, 1, 1, -1, -1, 1, -1, 1, -1, 1, -1, -1];
 const indices: number[] = [2, 1, 0, 0, 3, 2, 1, 3, 0, 2, 3, 1];
@@ -23,19 +25,9 @@ type BuildingFeatureCollection = {
     }>;
 };
 
-type ThreeCoordinate = [number, number, number];
-
 type ExtrusionResponse = {
     levels: number[];
 };
-
-function isCounterClockwise(ring: THREE.Vector2[]): boolean {
-    const signedArea = ring.reduce((area, point, index) => {
-        const next = ring[(index + 1) % ring.length];
-        return area + point.x * next.y - next.x * point.y;
-    }, 0);
-    return signedArea > 0;
-}
 
 class GeoJSONLoader {
 
@@ -73,7 +65,8 @@ class GeoJSONLoader {
             throw new RangeError("Building storeys must be a positive integer.");
         }
 
-        const polygon = rings.map((ring) => ring.map(([x, , z]) => [x, z]));
+        const normalizedRings = Triangulation.validateTopology(rings);
+        const polygon = normalizedRings.map((ring) => ring.map(([x, , z]) => [x, z]));
         const { data } = await axios.post<ExtrusionResponse>("/compute/matrix/extrude", {
             polygon,
             height: heightMeters,
@@ -90,83 +83,7 @@ class GeoJSONLoader {
             throw new Error("The extrusion service returned invalid floor elevations.");
         }
 
-        const normalizedRings = rings.map((ring) => {
-            const points = ring.map(([x, , z]) => new THREE.Vector2(x, z));
-            if (points.length > 1 && points[0].equals(points[points.length - 1])) {
-                points.pop();
-            }
-            if (points.length < 3) {
-                throw new Error("Each polygon ring must contain at least three distinct points.");
-            }
-            return points;
-        });
-
-        const contour = normalizedRings[0];
-        if (!contour) {
-            throw new Error("A polygon must contain an outer ring.");
-        }
-
-        const holes = normalizedRings.slice(1);
-        const triangulatedFaces = THREE.ShapeUtils.triangulateShape(contour, holes);
-        const points = normalizedRings.flat();
-
-        // Each floor elevation gets a copy of every 2D ring vertex.
-        const positions: number[] = [];
-        for (const level of levels) {
-            for (const point of points) {
-                positions.push(point.x, level, point.y);
-            }
-        }
-
-        const pointCount = points.length;
-        const topOffset = (levels.length - 1) * pointCount;
-        // Reverse cap triangles as needed so the base and roof face outward.
-        const indices = triangulatedFaces.flatMap(([a, b, c]) => {
-            const pointA = points[a];
-            const pointB = points[b];
-            const pointC = points[c];
-            const winding = (pointB.x - pointA.x) * (pointC.y - pointA.y)
-                - (pointB.y - pointA.y) * (pointC.x - pointA.x);
-            return winding > 0
-                ? [a, b, c, topOffset + a, topOffset + c, topOffset + b]
-                : [a, c, b, topOffset + a, topOffset + b, topOffset + c];
-        });
-
-        // Precompute each ring edge and its winding once, then reuse it between floors.
-        let ringOffset = 0;
-        const edges = normalizedRings.flatMap((ring, ringIndex) => {
-            const reverse = ringIndex === 0
-                ? isCounterClockwise(ring)
-                : !isCounterClockwise(ring);
-            const ringEdges = ring.map((_, index) => ({
-                start: ringOffset + index,
-                end: ringOffset + ((index + 1) % ring.length),
-                reverse,
-            }));
-            ringOffset += ring.length;
-            return ringEdges;
-        });
-        for (let levelIndex = 0; levelIndex < levels.length - 1; levelIndex += 1) {
-            const lowerOffset = levelIndex * pointCount;
-            const upperOffset = (levelIndex + 1) * pointCount;
-            for (const edge of edges) {
-                const lowerStart = lowerOffset + edge.start;
-                const lowerEnd = lowerOffset + edge.end;
-                const upperStart = upperOffset + edge.start;
-                const upperEnd = upperOffset + edge.end;
-                if (edge.reverse) {
-                    indices.push(lowerStart, upperEnd, lowerEnd, lowerStart, upperStart, upperEnd);
-                } else {
-                    indices.push(lowerStart, lowerEnd, upperEnd, lowerStart, upperEnd, upperStart);
-                }
-            }
-        }
-
-        const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-        geometry.setIndex(indices);
-        geometry.computeVertexNormals();
-        return geometry;
+        return Triangulation.createExtrudedGeometry(normalizedRings, levels);
     }
 
     static createMesh(geometry: THREE.BufferGeometry, material: THREE.Material): THREE.Mesh {
