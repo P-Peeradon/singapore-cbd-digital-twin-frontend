@@ -4,6 +4,10 @@
     "subtitle": "城市空间地理模拟平台",
     "district": "莱佛士坊与滨海湾金融中心"
   },
+  "controls": { 
+    "title": "模拟控制面板", 
+    "heightMultiplier": "建筑物拉伸高度倍率" 
+  },
   "metrics": {
     "far": "容积率 (FAR)",
     "valuation": "商业物业估值",

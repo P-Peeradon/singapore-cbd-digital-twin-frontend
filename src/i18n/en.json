@@ -4,6 +4,10 @@
         "subtitle": "Urban Geospatial Simulation Platform", 
         "district": "Raffles Place & Marina Bay Financial Centre" 
     }, 
+    "controls": { 
+        "title": "Simulation Controls", 
+        "heightMultiplier": "Extrusion Height Multiplier" 
+    },
     "metrics": { 
         "far": "Floor-Area Ratio (FAR)", 
         "valuation": "Commercial Valuation", 
