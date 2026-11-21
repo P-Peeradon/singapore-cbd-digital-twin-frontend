@@ -1,79 +1,120 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref } from 'vue'; 
+import { useI18n } from 'vue-i18n'; 
 
-const props = withDefaults(defineProps<{
-    modelValue?: number;
-}>(), {
-    modelValue: 1,
-});
+const { t, locale } = useI18n(); 
+const currentLocale = ref<string>(locale.value);
+const heightScale = ref<number>(3.5);
 
 const emit = defineEmits<{
-    (event: 'update:modelValue', value: number): void;
-    (event: 'storeyHeightMultiplier', value: number): void;
-    (event: 'storey-height-multiplier', value: number): void;
+  (e: 'update:heightScale', scale: number): void;
 }>();
 
-const multiplier = ref(props.modelValue);
+const onExtrusionChange = (): void => {
+  emit('update:heightScale', heightScale.value);
+};
 
-watch(() => props.modelValue, (value) => {
-    multiplier.value = value;
-});
-
-function emitMultiplier(event: Event): void {
-    const target = event.target;
-    if (!(target instanceof HTMLInputElement)) {
-        return;
-    }
-
-    const value = Number(target.value);
-    if (!Number.isFinite(value)) {
-        return;
-    }
-
-    multiplier.value = value;
-    emit('update:modelValue', value);
-    emit('storeyHeightMultiplier', value);
-    emit('storey-height-multiplier', value);
-}
+const toggleLanguage = (): void => {
+  locale.value = locale.value === 'en' ? 'zh' : 'en';
+  currentLocale.value = locale.value;
+};
 </script>
 
 <template>
-    <section class="simulation-control" aria-label="Simulation controls">
-        <label for="storey-height-multiplier">
-            Storey height multiplier
-        </label>
-        <input
-            id="storey-height-multiplier"
-            name="storey-height-multiplier"
-            type="range"
-            min="0.5"
-            max="2"
-            step="0.1"
-            :value="multiplier"
-            @input="emitMultiplier"
-        >
-        <output for="storey-height-multiplier">{{ multiplier.toFixed(1) }}x</output>
-    </section>
+    <aside class="simulation-controls-panel"> 
+        <div class="panel-header"> 
+            <h3>{{ t('controls.title') }}</h3>
+            <button class="lang-toggle-btn" @click="toggleLanguage">
+                {{ currentLocale === 'en' ? '中文' : 'English' }}
+            </button>
+        </div> 
+        <div class="control-group">
+            <label for="height-scale">
+                {{ t('controls.heightMultiplier') }}: <strong>{{ heightScale.toFixed(1) }}x</strong>
+            </label> 
+            <input
+                id="height-scale"
+                type="range"
+                v-model.number="heightScale"
+                min="1.0"
+                max="10.0"
+                step="0.5"
+                @input="onExtrusionChange"
+            />
+            <div class="scale-indicators"> 
+                <span>1.0x</span> 
+                <span>5.0x</span> 
+                <span>10.0x</span> 
+            </div> 
+        </div> 
+    </aside>
 </template>
 
 <style scoped>
-.simulation-control {
-    position: fixed;
-    z-index: 10;
-    top: 1rem;
-    left: 1rem;
-    display: grid;
-    grid-template-columns: auto minmax(12rem, 18rem) auto;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem 1rem;
-    border: 1px solid rgb(255 255 255 / 20%);
-    border-radius: 0.5rem;
-    background: rgb(20 20 25 / 85%);
-    color: white;
-}
+.simulation-controls-panel { 
+    position: absolute; 
+    top: 20px; 
+    right: 20px; 
+    background: rgba(20, 20, 25, 0.85); 
+    backdrop-filter: blur(10px); 
+    border: 1px solid rgba(255, 255, 255, 0.1); 
+    border-radius: 8px; 
+    padding: 16px; 
+    color: #ffffff; 
+    z-index: 100; 
+    width: 280px; 
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4); 
+} 
 
-input {
-    width: 100%;
+.panel-header { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    margin-bottom: 14px; 
+} 
+
+.panel-header h3 { 
+    font-size: 15px; 
+    margin: 0; 
+    font-weight: 600; 
+} 
+
+.lang-toggle-btn { 
+    background: rgba(255, 255, 255, 0.15); 
+    border: 1px solid rgba(255, 255, 255, 0.2); 
+    color: #ffffff; 
+    padding: 4px 10px; 
+    border-radius: 4px; 
+    cursor: pointer; 
+    font-size: 12px; 
+    transition: background 0.2s; 
+} 
+
+.lang-toggle-btn:hover { 
+    background: rgba(255, 255, 255, 0.25); 
+} 
+
+.control-group { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 6px; 
+} 
+.control-group label { 
+    font-size: 13px; 
+    color: #cbd5e1; 
+} 
+
+.control-group input[type="range"] { 
+    width: 100%; 
+    accent-color: #3b82f6; 
+    cursor: pointer; 
+} 
+
+.scale-indicators { 
+    display: flex; 
+    justify-content: space-between; 
+    font-size: 11px; 
+    color: #64748b; 
 }
 </style>
